@@ -35,9 +35,10 @@ contract MergePay is ChainlinkClient {
   );
 
   //Deposit[] private _deposits;
-  User[] private _users;
+  //User[] private _users;
 
   mapping (address => Deposit) private addressToDeposit ;
+  mapping (address => User) private addressToUser ;
 
   //MergeCoin _mergeCoin;
 
@@ -64,29 +65,16 @@ contract MergePay is ChainlinkClient {
 
     // find existing deposit
     bool updatedExisting = false;
-    /*for (uint256 i; i < _deposits.length; i++) {
-      if (
-        _deposits[i].typeOfDesposit == type &&
-        _deposits[i].id == id &&
-        _deposits[i].sender == msg.sender
-      ) {
-        // add amount to existing deposit
-        _deposits[i].amount += msg.value;
-        updatedExisting = true;
-        emit DepositEvent(
-          _deposits[i].amount,
-          _deposits[i].typeOfDesposit,
-          _deposits[i].id,
-          _deposits[i].sender
-        );
-        break;
-      }
-    }*/
-
     if(addressToDeposit[msg.sender]) {
         // add amount to existing deposit
         _deposits[i].amount += msg.value;
         updatedExisting = true;
+        emit DepositEvent(
+          addressToDeposit[msg.sender].amount,
+          addressToDeposit[msg.sender].typeOfDesposit,
+          addressToDeposit[msg.sender].id,
+          addressToDeposit[msg.sender].sender
+        );
     }
 
     // add new deposit
@@ -101,12 +89,12 @@ contract MergePay is ChainlinkClient {
   /// @dev githubUser named after msg.sender. Adds user as unconfirmed and sends
   /// @dev a chainlink request, that will be fullfilled in registerConfirm.
   /// @param githubUser The GitHub username to register
-  function register(string memory githubUser) external {
+  function register(string calldata githubUser) external {
     Chainlink.Request memory request = buildChainlinkRequest(clJobId, address(this), this.registerConfirm.selector);
     request.add("username", githubUser);
     request.add("repo", string(abi.encodePacked(msg.sender)));
     bytes32 requestId = sendChainlinkRequestTo(clOracle, request, clFee);
-    _users.push(User(msg.sender, githubUser, false, requestId));
+    addressToUser[msg.sender] = User(msg.sender, githubUser, false, requestId);
   }
 
   /// @dev Chainlink fullfill method. Sets unconfirmed user to confirmed if repo exists.
@@ -114,18 +102,17 @@ contract MergePay is ChainlinkClient {
   /// @param confirmed Whether a repo named after the address was found or not
   function registerConfirm(bytes32 _requestId, bool confirmed) external {
     require(confirmed, "Account ownership could not be validated.");
-    for (uint256 i = 0; i < _users.length; i++) {
-      if (_users[i].chainlinkRequestId == _requestId) {
-        _users[i].confirmed = true;
-        emit RegistrationConfirmedEvent(
-          _users[i].account,
-          _users[i].githubUser,
-          _users[i].confirmed,
-          _users[i].chainlinkRequestId
-        );
-        break;
+      if (addressToUser[msg.sender].chainlinkRequestId == _requestId) {
+        addressToUser[msg.sender].confirmed = true;
       }
-    }
+
+
+    emit RegistrationConfirmedEvent(
+      addressToUser[msg.sender].account,
+      addressToUser[msg.sender].githubUser,
+      addressToUser[msg.sender].confirmed,
+      addressToUser[msg.sender].chainlinkRequestId
+    );
   }
 
   /// @dev Send deposit back to sender.
