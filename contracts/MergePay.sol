@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
-import "@chainlink/contracts/src/v0.6/ChainlinkClient.sol";
+//import "@chainlink/contracts/src/v0.6/ChainlinkClient.sol";
 import "./MergeCoin.sol";
 
 contract MergePay is ChainlinkClient {
+//tight packing
   struct Deposit {
+    uint8 typeOfDesposit;
     uint256 amount;
-    uint8 type;
     uint256 id;
     address sender;
   }
+
 
   struct User {
     address account;
@@ -21,7 +23,7 @@ contract MergePay is ChainlinkClient {
 
   event DepositEvent(
     uint256 amount,
-    uint8 type,
+    uint8 typeOfDesposit,
     uint256 id,
     address sender
   );
@@ -32,10 +34,12 @@ contract MergePay is ChainlinkClient {
     bytes32 chainlinkRequestId
   );
 
-  Deposit[] private _deposits;
+  //Deposit[] private _deposits;
   User[] private _users;
 
-  MergeCoin _mergeCoin;
+  mapping (address => Deposit) private addressToDeposit ;
+
+  //MergeCoin _mergeCoin;
 
   address private clOracle;
   bytes32 private clJobId;
@@ -55,14 +59,14 @@ contract MergePay is ChainlinkClient {
   /// @dev TODO: lock up deposit
   /// @param type Issues = 1, Pull Requests = 2
   /// @param id The node ID of the issue or pr
-  function deposit(uint8 type, uint256 id) external payable {
+  function deposit(uint8 typeOfDesposit, uint256 id) external payable {
     require(msg.value > 0, "No ether sent.");
 
     // find existing deposit
     bool updatedExisting = false;
-    for (uint256 i; i < _deposits.length; i++) {
+    /*for (uint256 i; i < _deposits.length; i++) {
       if (
-        _deposits[i].type == type &&
+        _deposits[i].typeOfDesposit == type &&
         _deposits[i].id == id &&
         _deposits[i].sender == msg.sender
       ) {
@@ -71,18 +75,24 @@ contract MergePay is ChainlinkClient {
         updatedExisting = true;
         emit DepositEvent(
           _deposits[i].amount,
-          _deposits[i].type,
+          _deposits[i].typeOfDesposit,
           _deposits[i].id,
           _deposits[i].sender
         );
         break;
       }
+    }*/
+
+    if(addressToDeposit[msg.sender]) {
+        // add amount to existing deposit
+        _deposits[i].amount += msg.value;
+        updatedExisting = true;
     }
 
     // add new deposit
     if (!updatedExisting) {
-      Deposit memory newDeposit = Deposit(msg.value, type, id, prId, msg.sender);
-      _deposits.push(newDeposit);
+      addressToDeposit[msg.sender] =  Deposit(msg.value, type, id, prId, msg.sender);
+      //_deposits.push(newDeposit);
       emit DepositEvent(msg.value, type, id, msg.sender);
     }
   }
@@ -94,7 +104,7 @@ contract MergePay is ChainlinkClient {
   function register(string memory githubUser) external {
     Chainlink.Request memory request = buildChainlinkRequest(clJobId, address(this), this.registerConfirm.selector);
     request.add("username", githubUser);
-    request.add("repo", addressToString(msg.sender));
+    request.add("repo", string(abi.encodePacked(msg.sender)));
     bytes32 requestId = sendChainlinkRequestTo(clOracle, request, clFee);
     _users.push(User(msg.sender, githubUser, false, requestId));
   }
@@ -125,7 +135,7 @@ contract MergePay is ChainlinkClient {
   /// @param githubuUser The GitHub username of the user who wants to withdraw.
   /// @param type Issues = 1, Pull Requests = 2
   /// @param id The node ID of the issue or pr
-  function withdraw(string memory githubUser, uint8 type, uint256 id) external {
+  function withdraw(string memory githubUser, uint8 typeOfDesposit, uint256 id) external {
     // checks:
     // provided githubUser has repo with name of msg.sender (proof of github account, can receive funds) [chainlink->repourl->id]
     // pr is merged and pr author is the provided githubUser [chainlink->pr->merged]
@@ -138,7 +148,7 @@ contract MergePay is ChainlinkClient {
   /// @dev Convert address type to string type.
   /// @param _address The address to convert
   /// @returns _uintAsString The string representation of _address
-  function addressToString(address _address) public pure returns (string memory _uintAsString) {
+  /*function addressToString(address _address) public pure returns (string memory _uintAsString) {
     uint _i = uint256(_address);
     if (_i == 0) {
       return "0";
@@ -156,5 +166,5 @@ contract MergePay is ChainlinkClient {
       _i /= 10;
     }
     return string(bstr);
-  }
+  }*/
 }
