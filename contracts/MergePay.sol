@@ -122,7 +122,7 @@ contract MergePay is ChainlinkClient {
   /// @param githubuUser The GitHub username of the user who wants to withdraw.
   /// @param type Issues = 1, Pull Requests = 2
   /// @param id The node ID of the issue or pr
-  function withdraw(string memory githubUser, uint8 typeOfDesposit, uint256 id) external {
+  function withdraw(string calldata githubUser, uint8 typeOfDesposit, uint256 id) external {
     // checks:
     // provided githubUser has repo with name of msg.sender (proof of github account, can receive funds) [chainlink->repourl->id]
     // pr is merged and pr author is the provided githubUser [chainlink->pr->merged]
